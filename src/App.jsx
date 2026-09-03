@@ -27,6 +27,7 @@ export default function App() {
   const [shareLink, setShareLink] = useState("");
   const [copied, setCopied] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
 
   const socketRef = useRef(null);
   const peerRef = useRef(null);
@@ -53,9 +54,20 @@ export default function App() {
 
     socket.on("connect", () => {
       console.log("Socket connected:", socket.id);
+      if (roomIdRef.current && roleRef.current) {
+        socket.emit("join-room", {
+          roomId: roomIdRef.current,
+          role: roleRef.current,
+        });
+      }
     });
 
     socket.on("viewer-joined", async () => {
+      if (peerRef.current && peerRef.current.connectionState === "connected") {
+        setStatus("Viewer đã kết nối lại (Socket). WebRTC vẫn đang giữ.");
+        return;
+      }
+
       if (peerRef.current) {
         peerRef.current.close();
       }
@@ -103,6 +115,11 @@ export default function App() {
     });
 
     socket.on("broadcaster-joined", () => {
+      if (peerRef.current && peerRef.current.connectionState === "connected") {
+        setStatus("Người phát đã kết nối lại (Socket). WebRTC vẫn đang giữ.");
+        return;
+      }
+
       setStatus("Người phát đã vào phòng.");
       if (peerRef.current) {
         peerRef.current.close();
@@ -155,11 +172,13 @@ export default function App() {
     setRole(sharedRole);
     roomIdRef.current = sharedRoom;
     roleRef.current = sharedRole;
+    setIsJoining(true);
     
     if (sharedRole === "broadcaster") {
       startBroadcaster().catch((err) => {
         console.error(err);
         setStatus(`Lỗi: ${err.message}`);
+        setIsJoining(false);
       });
     } else {
       startViewer();
@@ -261,6 +280,7 @@ export default function App() {
     }
     roomIdRef.current = trimmedRoomId;
     roleRef.current = role;
+    setIsJoining(true);
 
     try {
       if (role === "broadcaster") {
@@ -271,6 +291,7 @@ export default function App() {
     } catch (err) {
       console.error(err);
       setStatus(`Lỗi: ${err.message}`);
+      setIsJoining(false);
     }
   }
 
@@ -282,6 +303,7 @@ export default function App() {
     roleRef.current = "viewer";
     setShareLink(buildShareLink(newRoomId));
     setCopied(false);
+    setIsJoining(true);
     startViewer();
   }
 
@@ -300,15 +322,17 @@ export default function App() {
 
   return (
     <div className="app">
-      {!gameMode && !isAutoJoin && (
+      {!gameMode && (
         <>
           <h1>WebRTC 1-to-1</h1>
 
-          <div className="controls">
-            <button onClick={handleCreateRoom} disabled={joined}>
-              Tạo phòng để theo dõi
-            </button>
-          </div>
+          {!isJoining && !joined && (
+            <div className="controls">
+              <button onClick={handleCreateRoom}>
+                Tạo phòng để theo dõi
+              </button>
+            </div>
+          )}
 
           {shareLink && (
             <div className="share-link">
@@ -322,25 +346,26 @@ export default function App() {
             </div>
           )}
 
-          <details className="manual-join">
-            <summary>Vào phòng thủ công</summary>
-            <div className="controls">
-              <input
-                type="text"
-                placeholder="Room ID"
-                value={roomId}
-                onChange={(e) => setRoomId(e.target.value)}
-                disabled={joined}
-              />
-              <select value={role} onChange={(e) => setRole(e.target.value)} disabled={joined}>
-                <option value="broadcaster">Người phát (Chơi)</option>
-                <option value="viewer">Người xem (Khán giả)</option>
-              </select>
-              <button onClick={handleJoin} disabled={joined}>
-                Vào phòng
-              </button>
-            </div>
-          </details>
+          {!isJoining && !joined && (
+            <details className="manual-join">
+              <summary>Vào phòng thủ công</summary>
+              <div className="controls">
+                <input
+                  type="text"
+                  placeholder="Room ID"
+                  value={roomId}
+                  onChange={(e) => setRoomId(e.target.value)}
+                />
+                <select value={role} onChange={(e) => setRole(e.target.value)}>
+                  <option value="broadcaster">Người phát (Chơi)</option>
+                  <option value="viewer">Người xem (Khán giả)</option>
+                </select>
+                <button onClick={handleJoin}>
+                  Vào phòng
+                </button>
+              </div>
+            </details>
+          )}
         </>
       )}
 
