@@ -56,10 +56,14 @@ export default function App() {
     });
 
     socket.on("viewer-joined", async () => {
-      const peer = peerRef.current;
-      if (!peer) {
-        return;
+      if (peerRef.current) {
+        peerRef.current.close();
       }
+      const peer = createPeerConnection();
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => peer.addTrack(track, localStreamRef.current));
+      }
+
       setStatus("Viewer đã vào, đang gửi offer...");
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
@@ -100,6 +104,10 @@ export default function App() {
 
     socket.on("broadcaster-joined", () => {
       setStatus("Người phát đã vào phòng.");
+      if (peerRef.current) {
+        peerRef.current.close();
+      }
+      createPeerConnection();
     });
 
     socket.on("broadcaster-left", () => {
