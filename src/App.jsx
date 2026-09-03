@@ -319,10 +319,12 @@ export default function App() {
   // gameMode is true only for the player (broadcaster)
   const gameMode = role === "broadcaster" && joined;
   const isAutoJoin = new URLSearchParams(window.location.search).has("room");
+  const isBroadcasterJoining = role === "broadcaster" && (isJoining || isAutoJoin || joined);
+  const showLobby = !gameMode && !isBroadcasterJoining;
 
   return (
     <div className="app">
-      {!gameMode && (
+      {showLobby && (
         <>
           <h1>WebRTC 1-to-1</h1>
 
@@ -369,7 +371,7 @@ export default function App() {
         </>
       )}
 
-      {!gameMode && <div className="status">{status}</div>}
+      {showLobby && <div className="status">{status}</div>}
 
       {(role === "viewer" || role === "broadcaster") && (
         <div 
